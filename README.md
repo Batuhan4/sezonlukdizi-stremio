@@ -2,7 +2,7 @@
 
 SezonlukDizi (sezonlukdizi.cc) üzerindeki yabancı dizileri Stremio'da, Türkçe **altyazı** ve **dublaj** seçenekleriyle izlemenizi sağlayan bir addon.
 
-> **Not:** Bu proje, kardeş addon [hdfilmcehennemi-stremio](https://github.com/enXov/hdfilmcehennemi-stremio) mimarisi temel alınarak sezonlukdizi.cc için sıfırdan uyarlanmıştır (fork-style build). Stremio SDK iskeleti, m3u8 proxy tasarımı, logger/errors/proxy katmanları ortaktır; arama, bölüm çözümleme ve video çıkarma mantığı bu siteye özgüdür.
+> **Not:** Bu proje, kardeş addon [hdfilmcehennemi-stremio](https://github.com/batuhan4/hdfilmcehennemi-stremio) mimarisi temel alınarak sezonlukdizi.cc için sıfırdan uyarlanmıştır (fork-style build). Stremio SDK iskeleti, m3u8 proxy tasarımı, logger/errors/proxy katmanları ortaktır; arama, bölüm çözümleme ve video çıkarma mantığı bu siteye özgüdür.
 
 ## Özellikler
 
