@@ -228,6 +228,11 @@ function upstreamHeaders(referer) {
 /**
  * Rewrite all URLs in an m3u8 playlist to go through our /proxy/stream endpoint
  * Handles segment lines, nested playlists, and URI="..." attributes (audio/subtitle tracks)
+ *
+ * Every rewritten URL is given a real media extension on its PATH before the
+ * query string ('/proxy/stream/pl.m3u8?...' for nested playlists, '.../seg.ts?...'
+ * for segments) so ffmpeg >=7.1 (extension_picky=1) accepts it at parse time.
+ *
  * @param {string} content - Raw m3u8 content
  * @param {string} playlistUrl - Full URL of the playlist being rewritten (for resolving relative paths)
  * @param {string} ref - Already-encoded ref query parameter to propagate
@@ -245,7 +250,13 @@ function rewritePlaylist(content, playlistUrl, ref) {
             return originalUrl; // unresolvable — leave the line untouched
         }
         const encodedUrl = Buffer.from(fullUrl).toString('base64url');
-        return `${BASE_URL}/proxy/stream?url=${encodedUrl}&ref=${ref || ''}`;
+        // Give the proxied path a real media extension BEFORE the query so
+        // ffmpeg >=7.1 (extension_picky=1) accepts it at parse time. Nested
+        // playlists (upstream .m3u8/.txt) get pl.m3u8; segments get seg.ts.
+        const upstreamPath = fullUrl.split('?')[0];
+        const fname = (upstreamPath.endsWith('.m3u8') || upstreamPath.endsWith('.txt'))
+            ? 'pl.m3u8' : 'seg.ts';
+        return `${BASE_URL}/proxy/stream/${fname}?url=${encodedUrl}&ref=${ref || ''}`;
     };
 
     return content.split('\n').map(line => {
@@ -321,9 +332,14 @@ app.get('/proxy/m3u8', async (req, res) => {
 
 /**
  * Stream Proxy Endpoint - Proxies video segments with Referer header
- * Handles both m3u8 sub-playlists and .ts/.m4s segments
+ * Handles both m3u8 sub-playlists and .ts/.m4s segments.
+ *
+ * Registered on two paths: the bare /proxy/stream (backward compat) and
+ * /proxy/stream/:fname where :fname is a cosmetic real-extension filename
+ * (pl.m3u8 / seg.ts) that lets ffmpeg >=7.1 accept the URL at parse time.
+ * The :fname is ignored; the actual target comes from the ?url= param.
  */
-app.get('/proxy/stream', async (req, res) => {
+async function proxyStreamHandler(req, res) {
     try {
         const { url, ref } = req.query;
 
@@ -358,7 +374,13 @@ app.get('/proxy/stream', async (req, res) => {
             res.set('Cache-Control', 'no-cache');
             res.send(content);
         } else {
-            // Binary content (video/audio segments) - pipe with backpressure handling
+            // Binary content (video/audio segments) - pipe with backpressure handling.
+            // Verified against vmeas.cloud (VidMoly CDN): segments are genuine
+            // MPEG-TS (0x47 sync bytes) and the upstream already sends the correct
+            // 'video/MP2T' Content-Type, so pass it through; 'video/mp2t' is only
+            // the fallback when the upstream omits the header. (This differs from
+            // hdfilmcehennemi, whose CDN mislabels TS segments as image/jpeg and
+            // therefore needs the type forced.)
             res.set('Content-Type', contentType || 'video/mp2t');
             const contentLength = response.headers.get('content-length');
             if (contentLength) res.set('Content-Length', contentLength);
@@ -382,7 +404,12 @@ app.get('/proxy/stream', async (req, res) => {
             res.destroy();
         }
     }
-});
+}
+
+// Bare path kept for backward compat; /:fname carries the cosmetic real
+// extension (pl.m3u8 / seg.ts) that ffmpeg >=7.1 needs to accept the URL.
+app.get('/proxy/stream', proxyStreamHandler);
+app.get('/proxy/stream/:fname', proxyStreamHandler);
 
 // Serve the addon logo (self-hosted PNG shipped with the addon, so we don't
 // hotlink the source site). Referenced by manifest.logo.
