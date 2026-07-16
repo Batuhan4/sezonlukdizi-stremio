@@ -31,7 +31,7 @@ const manifest = {
     version: '1.0.0',
     name: 'SezonlukDizi',
     description: 'SezonlukDizi üzerinden yabancı dizileri Türkçe altyazı ve dublaj ile izleyin.',
-    logo: `${SITE_BASE_URL}/favicon.ico`,
+    logo: `${BASE_URL}/logo.png`,
     resources: ['stream'],
     types: ['series'],
     catalogs: [],
@@ -382,6 +382,13 @@ app.get('/proxy/stream', async (req, res) => {
             res.destroy();
         }
     }
+});
+
+// Serve the addon logo (self-hosted PNG shipped with the addon, so we don't
+// hotlink the source site). Referenced by manifest.logo.
+app.get('/logo.png', (req, res) => {
+    res.set('Cache-Control', 'public, max-age=86400');
+    res.sendFile(__dirname + '/logo.png');
 });
 
 // Mount Stremio addon router
