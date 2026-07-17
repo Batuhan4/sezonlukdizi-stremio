@@ -213,8 +213,10 @@ app.use((req, res, next) => {
  * @returns {Object} Headers object
  */
 function upstreamHeaders(referer) {
+    // Full Chrome UA: some CDNs (OK.ru's okcdn.ru signs srcAg=CHROME) reject a
+    // truncated UA with HTTP 400, so mirror httpClient's browser UA here.
     const headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     };
     if (referer) {
         headers['Referer'] = referer;
