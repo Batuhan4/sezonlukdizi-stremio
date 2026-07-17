@@ -9,7 +9,7 @@ SezonlukDizi (sezonlukdizi.cc) üzerindeki yabancı dizileri Stremio'da, Türkç
 - 📺 Dizi desteği (sadece `series` — film kapsam dışı)
 - 🔤 Türkçe altyazılı (Altyazı) ve dublajlı (Dublaj) kaynaklar ayrı stream olarak
 - 🔗 IMDb ID → dizi eşleştirmesi tek istekte (site aramasi tt-id kabul ediyor)
-- 🧩 Çoklu embed host desteği (şu an çözümleyicisi olan: **VidMoly**; diğerleri için altyapı hazır)
+- 🧩 Çoklu embed host desteği: **VidMoly, Filemoon, Sibnet, VideoSoft, Okru, Streamruby** (bir bölümde birden çok kaynak varsa hepsi ayrı stream olarak listelenir)
 - 📡 TV uyumluluğu için sunucu-taraflı m3u8 proxy (`/proxy/m3u8`)
 
 ## Nasıl çalışır
@@ -26,6 +26,26 @@ IMDb id ──POST /ajax/arama.asp q=<ttid>──▶ dizi sayfası + slug
 - **IMDb eşleştirme:** Arama endpoint'i (`/ajax/arama.asp`) doğrudan tt-id kabul ettiği için Cinemeta'ya gerek yok. Boş dönerse: Cinemeta başlık → başlıkla arama → dizi sayfasındaki `imdb.com/title/tt...` bağlantısıyla doğrulama.
 - **Karakter kodlaması:** Site (HTML **ve** AJAX JSON) `windows-1254` kullanıyor. `httpClient.js` her gövdeyi ham bayt olarak okuyup `TextDecoder('windows-1254')` ile çözüyor — aksi halde Türkçe karakterler bozulur ve arama çalışmaz.
 - **Cloudflare:** Addon'un kullandığı hiçbir endpoint JA3/challenge kapısı arkasında değil (yalnızca `/diziler.asp?adi=` challenge veriyor, o da hiç kullanılmıyor). Bu yüzden `curl` fallback'ine gerek yok.
+
+## Desteklenen embed host'lar
+
+Bir bölüm için `dataAlternatif22.asp` birden çok host döndürebilir; yalnızca çözümleyicisi (`HOST_RESOLVERS`) olan host'lar denenir ve bulunanların hepsi ayrı stream olarak (host + Altyazılı/Dublaj etiketiyle) listelenir.
+
+| Host | Kaynak türü | Durum |
+|------|-------------|-------|
+| **VidMoly** | HLS (m3u8) | ✅ Çalışıyor |
+| **Filemoon** (Byse frontend) | HLS (m3u8) | ✅ Çalışıyor — API `AES-256-GCM` şifreli blob'u sunucu tarafında çözülür |
+| **Sibnet** | MP4 (progressive) | ✅ Çalışıyor — Referer-korumalı 302 zinciri gövde indirilmeden takip edilir |
+| **VideoSoft** (videoseyred.in) | HLS (m3u8) | ✅ Çalışıyor — `playlist/N.json` |
+| **Okru** (ok.ru) | HLS (m3u8) | ✅ Çalışıyor — tam Chrome UA gerekir (okcdn imzası) |
+| **Streamruby** (rubyvidhub) | HLS (m3u8) | ✅ Çalışıyor — P.A.C.K.E.R unpack; medya IP-locked (resolve+proxy aynı egress) |
+| **ABStream** (abstream.to) | HLS (m3u8) | ⚠️ Çözümleyici eklendi ama sitede canlı kaynak bulunamadı; uçtan uca test edilmedi |
+| **Netu / hqq.to** | — | ❌ Sunucu tarafında güvenilir çözülemedi |
+| **Pixel** | — | ❌ Cloudflare Turnstile captcha ile korunuyor |
+
+**Notlar:**
+- Medya token'ları kısa ömürlüdür (Filemoon ~3s, ABStream ~2s, Filemoon/Streamruby birkaç saat, Okru ~24s); addon her istekte anlık çözdüğü için sorun olmaz — çözülen m3u8 uzun süre önbelleğe alınmaz.
+- Bazı host'lar (Streamruby IP-lock; Okru/VideoSoft imzalı segmentler) medyanın, çözümü yapan sunucuyla **aynı egress IP**'sinden proxy'lenmesine dayanır — addon zaten segmentleri `/proxy/stream` üzerinden aynı çıkıştan sunar.
 
 ## Kurulum
 
@@ -82,7 +102,7 @@ Test, canlı siteye seri (rate-limited) istek atarak arama → bölüm çözüml
 
 ## Yeni embed host eklemek
 
-`scraper.js` içindeki `HOST_RESOLVERS` sözlüğüne, `dataAlternatif22.asp`'nin döndürdüğü `baslik` (küçük harf) anahtarıyla bir çözümleyici ekleyin. Her host kendi çıkarıcısını ve Referer davranışını gerektirir (Filemoon, Sibnet, Okru, Netu, Pixel, VideoSoft ...).
+`scraper.js` içindeki `HOST_RESOLVERS` sözlüğüne, `dataAlternatif22.asp`'nin döndürdüğü `baslik` (küçük harf) anahtarıyla bir çözümleyici ekleyin. Her çözümleyici embed iframe'ini alıp `{videoUrl, referer, origin}` döndürür. Ortak yardımcılar hazır: base64url çözme, HTML unescape, P.A.C.K.E.R (`eval(function(p,a,c,k,e,d))`) unpack ve gövdesiz redirect takibi. Mevcut host'lar için yukarıdaki [tabloya](#desteklenen-embed-hostlar) bakın; henüz çözülemeyenler Netu ve Pixel'dir.
 
 ## Lisans
 
